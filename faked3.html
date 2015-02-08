@@ -1,0 +1,225 @@
+
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+<style>
+
+html, body, #map {
+  height: 100%; }
+
+  body {
+    margin:0;
+    padding:0;
+  }
+
+.lineConnect {
+        fill: none;
+        stroke: #00b9e8;
+        opacity: .80;
+        stroke-width:2;    
+    }
+
+.friend3 {
+        fill: none;
+        stroke: blue;
+        opacity: .75;
+        stroke-width:3;
+}
+
+
+
+
+
+  </style>
+  <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+  <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+  <script src="http://d3js.org/d3.v3.min.js" type="text/javascript"></script>
+
+  <body>
+
+
+   <div id="map"></div>
+   <div id = "geojsonLayer"></div>
+
+   <script type="text/javascript">
+
+
+var tiles = L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+    maxZoom: 18});
+
+var map = L.map('map')
+    .setView([51.505, -0.09], 13);
+
+tiles.addTo(map);
+
+var tweenToggle = 0;
+var totalTimeSeconds = 10;
+var waypointSize = 3;
+    
+//Add SVG element to Leaflet's overlap pane; it has no width or height (they will be dynamically generated)  
+var svg = d3.select(map.getPanes().overlayPane).append("svg");
+var g = svg.append("g").attr("class", "leaflet-zoom-hide");
+
+
+render = function(collection) {
+   var collectionFeatures = collection.features; 
+
+  featuresdata = collectionFeatures.filter(function(d){
+    return d.properties
+  })
+
+
+  
+  //For converting GeoJSON to SVG
+   var transform = d3.geo.transform({
+            point: projectPoint
+        });
+
+  var d3path = d3.geo.path().projection(transform);
+
+   var toLine = d3.svg.line()
+            .interpolate("linear")
+            .x(function(d) {
+                return applyLatLngToLayer(d).x
+            })
+            .y(function(d) {
+                return applyLatLngToLayer(d).y
+            });
+
+  var linePath = g.selectAll("path")
+            .data([featuresdata])
+            .enter()
+            .append("path")
+            .attr("class", "lineConnect");
+
+
+  var originANDdestination = [featuresdata[0], featuresdata[featuresdata.length - 1]]
+  
+  //SVG is repositioned and rerendered whenever map zooms 
+   map.on("viewreset", reset);
+        reset();
+
+   // ------------------------------------- Functions --------------------------------------------
+    function reset() {
+
+                //Zoom handling 
+                var bounds = d3path.bounds(collection),
+                    topLeft = bounds[0],
+                    bottomRight = bounds[1];
+
+
+                // Setting the size and location of the overall SVG container
+                svg.attr("width", bottomRight[0] - topLeft[0] + 120)
+                    .attr("height", bottomRight[1] - topLeft[1] + 120)
+                    .style("left", topLeft[0] - 50 + "px")
+                    .style("top", topLeft[1] - 50 + "px");
+
+
+                linePath.attr("d", toLine)
+
+                g.attr("transform", "translate(" + (-topLeft[0] + 50) + "," + (-topLeft[1] + 50) + ")");
+
+                transition();
+
+            } // end reset
+
+    function transition(path) {
+                // var l = linePath.node().getTotalLength();
+
+                segments = [0];
+                for (var i = 1; i < featuresdata.length; i++) {
+                    var tmp = svg.append("path")
+                        .datum([featuresdata[i - 1], featuresdata[i]])
+                        .attr("d", toLine);
+                    segments.push(segments[i - 1] + tmp.node().getTotalLength());
+                    tmp.remove();
+                }
+
+
+                linePath.transition()
+                    .duration(totalTimeSeconds * 100000)
+                    .ease("linear")
+                    .attrTween("stroke-dasharray", tweenDash)
+                    .each("end", function() {
+
+                        d3.select(this).call(transition); 
+
+                    });
+
+            } //end transition
+
+      function tweenDash() {
+   
+                return function(t) {
+
+                 var l = linePath.node().getTotalLength();
+
+                //http://jsfiddle.net/Y62Hq/2/
+                interpolate = d3.interpolateString("0," + l, l + "," + l);
+
+
+
+                    var marker = d3.select("#marker");
+
+                    var p = linePath.node().getPointAtLength(t * l);
+
+                    // enable code for auto re-center
+                    if (tweenToggle == 0) {
+                        tweenToggle = 1;
+                        var newCenter = map.layerPointToLatLng(new L.Point(p.x, p.y));
+
+                        map.panTo(newCenter, 14);
+                    } else {
+                        tweenToggle = 0;
+                    }
+
+                    // marker.attr("transform", "translate(" + p.x + "," + p.y + ")"); //move marker
+
+                    // where on the line are we
+            var currentloc = parseFloat(interpolate(t).split(",")[0])
+
+            var seq = [];
+            for (var i = 0; i != segments.length - 1; ++i) seq.push(i)
+
+            sumval = seq.filter(function(d, i) {
+                return segments[i] < currentloc
+            });
+               return interpolate(t);
+                }
+            } //end tweenDash        
+
+       //For converting GeoJSON to SVG. Transform converts input geometry (spherical coords) to diff output geometry (projected screen coords)
+     function projectPoint(x, y) {
+                var point = map.latLngToLayerPoint(new L.LatLng(y, x));
+                this.stream.point(point.x, point.y);
+            } //end projectPoint
+
+
+      function applyLatLngToLayer(d) {
+        var y = d.geometry.coordinates[1]
+        var x = d.geometry.coordinates[0]
+        return map.latLngToLayerPoint(new L.LatLng(y, x))
+    }
+};
+
+var friend2 = d3.json("friend1_version2.geojson", render);
+
+// var friend3 = d3.json("friend3_version2.geojson", render);
+
+
+
+// d3.json("friend3_version2.geojson", render);
+
+  
+
+
+
+
+
+
+</script>
+
+</body>
+</html>
+

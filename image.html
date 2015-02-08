@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+<style>
+
+html, body, #map {
+  height: 100%; }
+
+  /*CSS reset, keeping designs consistent across browsers, forces content to sit in the very top left corner of browser*/
+  body {
+    margin:0;
+    padding:0;
+  }
+
+
+  </style>
+
+
+  <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+  <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+
+  <body>
+
+
+   <div id="map"></div>
+   <div id = "geojsonLayer"></div>
+
+   <script type="text/javascript">
+
+
+// Have to load the tiles for the map. Currently locally
+// served, eventually will come from Amazon S3
+var tiles = L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+  maxZoom: 18
+});
+var map = L.map('map')
+.setView([51.505, -0.09], 11);
+tiles.addTo(map);
+
+//Getting the geoJSON data for each person
+$.getJSON("data/friend1.geojson", function(data) {
+  var friend1 = L.geoJson(data, {
+    onEachFeature: function (feature, layer) {
+      layer.bindPopup(feature.properties.name);
+    }
+  });
+  friend1.addTo(map);
+  friend1.setStyle({color: '#eb6841', weight: 1.5, opacity: .5});
+});
+
+$.getJSON("data/friend2.geojson", function(data) {
+  var friend2 = L.geoJson(data, {
+    onEachFeature: function (feature, layer) {
+      layer.bindPopup(feature.properties.name);
+    }
+  });
+  friend2.addTo(map);
+  friend2.setStyle({color: '#ffcb05', weight: 1.5, opacity:.5});
+});
+
+$.getJSON("data/friend3.geojson", function(data) {
+  var friend3 = L.geoJson(data, {
+    onEachFeature: function (feature, layer) {
+      layer.bindPopup(feature.properties.name);
+    }
+  });
+  friend3.addTo(map);
+  friend3.setStyle({color: '#00b9e8', weight: 1.5, opacity: .5});
+});
+
+console.log("here");
+
+</script>
+
+</body>
+</html>
+

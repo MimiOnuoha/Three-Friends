@@ -1,0 +1,196 @@
+<!DOCTYPE html>
+<html>
+<meta charset="utf-8">
+<link rel="stylesheet" href="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.css" />
+<style>
+
+html, body, #map {
+  height: 100%; }
+
+  body {
+    margin:0;
+    padding:0;
+  }
+
+  .lineConnect {
+    fill: none;
+    stroke: #eb6841;
+    opacity: .80;
+    stroke-width:2;    
+  }
+
+  .friend3 {
+    fill: none;
+    stroke: blue;
+    opacity: .75;
+    stroke-width:3;
+  }
+
+
+
+
+  </style>
+  <script src="http://cdn.leafletjs.com/leaflet-0.7.3/leaflet.js"></script>
+  <script src="http://code.jquery.com/jquery-1.10.2.min.js"></script>
+  <script src="http://d3js.org/d3.v3.min.js" type="text/javascript"></script>
+
+  <body>
+
+
+   <div id="map"></div>
+   <div id = "geojsonLayer"></div>
+
+   <script type="text/javascript">
+
+
+   var tiles = L.tileLayer('/tiles/{z}/{x}/{y}.png', {
+    maxZoom: 18});
+
+    //setup map 
+    var map = L.map('map')
+      .setView([51.505, -0.09], 13);
+
+    tiles.addTo(map);
+
+    //Add SVG element to Leaflet's overlap pane; right now it has no width or height (they will be dynamically generated maybe if I can make it work)  
+    var svg = d3.select(map.getPanes().overlayPane).append("svg");
+    var g = svg.append("g").attr("class", "leaflet-zoom-hide");
+
+
+    //Need this line path helper for the geojsonToLinePaths function
+    var lineGenerator = d3.svg.line()
+                      .interpolate("linear")
+                      .x(function(d) {return applyLatLngToLayer(d).x})
+                      .y(function(d) {return applyLatLngToLayer(d).y});
+
+
+
+    //get geojson files -- wait until all of them are loaded
+    getAllGeoJsons(["friend1_version2.geojson", "friend3_version2.geojson"], function(results) {
+         render(results);
+          // re-render if view changes size
+         map.on("viewreset", function() { render(results) });
+    })
+
+
+ 
+    function setSVGHeightAndWidth(){ 
+          svg.style("width", $("#map").width());
+          svg.style("height", $("#map").height());
+      // svg.attr("height") = map.height;
+      // svg.attr("width") = map.width;
+     }
+
+    function getColor() {
+        colors = [
+          "blue",
+          "yellow",
+          "red",
+          "green",
+        ]
+        index = Math.floor(Math.random() * 4);
+        return colors[index];
+    }
+
+    function applyLatLngToLayer(d) {
+            var y = d.geometry.coordinates[1]
+            var x = d.geometry.coordinates[0]
+            return map.latLngToLayerPoint(new L.LatLng(y, x))
+        }
+
+    function geojsonToLinepaths(g, data) { 
+   
+            features = data.map(function(d) {return d.features}); //we want a list of list of the features
+            var linepaths = g.selectAll("path")
+                  .data(features)
+                  .enter()
+                  .append("path")
+                  .attr("d", lineGenerator)
+                  .attr("stroke", getColor)
+                  .attr("fill-opacity", "0")
+            return linepaths;
+       }
+
+    function animateLinePaths(linepaths) { 
+        linepaths.each(function(d){ console.log(this); d.totalLength = this.getTotalLength();})
+              .attr("stroke-dasharray", function(d){ return d.totalLength + " " + d.totalLength})
+             .attr("stroke-dashoffset", function(d){ return d.totalLength})
+             .transition()
+             .duration(100000)
+             .ease("linear")
+             .attr("stroke-dashoffset", 0);
+     }
+
+
+
+    function getAllGeoJsons(urls, callback) {
+         var results = [];
+         // introduce new scope to capture loop index 
+         var loaded = function(i){
+            return function(data){
+              results[i] = data;
+            } 
+         }
+         // kick off requests to all files and store them in results
+         for (var i = 0; i < urls.length; i++){
+           var url = urls[i];
+           var dataIndex = i;
+           results.push(null);
+           d3.json(url, loaded(i));
+         }
+
+         
+         //results now consists of an array of nulls. As each request
+         // finishes it will set one of the null values to some data
+         timeoutFunc = function(){
+           var loaded = true;
+
+           // check if there are no nulls in the results list, if there aren't
+           // then we have finished loading.
+           for(var i = 0; i < results.length; i++){
+             if(results[i] == null){
+               loaded = false
+             }
+           }
+           if(loaded) {
+             callback(results);
+           } else {
+             setTimeout(timeoutFunc, 100);
+           }
+          };
+
+         setTimeout(timeoutFunc, 100) // check every 10th of a second if we have finished loading
+        }
+
+
+
+
+     
+    function render(geojsons) {
+      g.selectAll("path").remove();
+     //set SVG height and width to map height and width somehow
+     setSVGHeightAndWidth();
+
+
+     var linepaths = geojsonToLinepaths(g, geojsons);
+     linepaths.attr("d", lineGenerator);
+
+     animateLinePaths(linepaths);
+    }
+
+
+   
+
+
+
+
+
+
+
+
+
+</script>
+
+</body>
+</html>
+
